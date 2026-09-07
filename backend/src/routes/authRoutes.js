@@ -6,7 +6,9 @@ import {
   forgotPassword,
   resetPassword,
   getMe,
-  resendVerification
+  resendVerification,
+  updateProfile,
+  verifyDirect
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -19,5 +21,7 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 router.get('/me', protect, getMe);
 router.post('/resend-verification', protect, resendVerification);
+router.put('/profile', protect, updateProfile);
+router.post('/verify-direct', protect, verifyDirect);
 
 export default router;

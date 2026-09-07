@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="css/style.css?v=3.2" />
+  <link rel="stylesheet" href="css/style.css?v=3.3" />
 </head>
 <body>
 
@@ -61,6 +61,11 @@
               <span class="dropdown-user-status" id="dropdownUserVerified">● Correo verificado</span>
             </div>
             <div class="user-dropdown-divider"></div>
+            <button type="button" id="openSettingsBtn" class="dropdown-item">
+              <i data-lucide="sliders"></i>
+              <span>Mi Servicio Social (Metas y Fechas)</span>
+            </button>
+            <div class="user-dropdown-divider"></div>
             <button type="button" id="logoutBtn" class="dropdown-item logout-item">
               <i data-lucide="log-out"></i>
               <span>Cerrar Sesión</span>
@@ -76,16 +81,20 @@
       </div>
     </header>
 
-    <!-- Banner de Aviso de Verificación de Correo (visible si el email no ha sido confirmado) -->
+    <!-- Banner de Aviso de Verificación de Correo -->
     <div id="unverifiedEmailBanner" class="unverified-banner" style="display: none;">
       <div class="unverified-banner-content">
         <i data-lucide="mail-warning"></i>
-        <span>Por favor verifica tu correo para proteger tu cuenta. Si estás en modo local, puedes validarlo directamente aquí.</span>
+        <span>Revisa tu bandeja de entrada o <strong>Spam</strong> para validar tu correo. También puedes activarla directamente con un clic si estás en fase de prueba.</span>
       </div>
       <div class="unverified-banner-actions">
-        <button type="button" id="btnResendVerification" class="btn-banner-action" title="Reenviar correo o validar en modo local">
+        <button type="button" id="btnValidateDirect" class="btn-banner-action btn-banner-success" title="Validar mi cuenta ahora sin esperar el correo">
+          <i data-lucide="check-circle-2"></i>
+          <span>Validar cuenta ahora</span>
+        </button>
+        <button type="button" id="btnResendVerification" class="btn-banner-action" title="Reenviar correo de verificación">
           <i data-lucide="send"></i>
-          <span>Reenviar / Verificar</span>
+          <span>Reenviar correo</span>
         </button>
         <button type="button" id="closeUnverifiedBannerBtn" class="btn-close-banner" aria-label="Cerrar aviso"><i data-lucide="x"></i></button>
       </div>
@@ -93,10 +102,11 @@
 
     <!-- Hero Section -->
     <section class="hero-section" data-animate>
-      <div class="hero-badge">
+      <button type="button" id="heroPeriodoBadgeBtn" class="hero-badge hero-badge-btn" title="Personalizar fechas y meta de horas de tu servicio social">
         <i data-lucide="calendar"></i>
-        <span>Periodo Oficial · 1 Julio 2026 — 31 Diciembre 2026</span>
-      </div>
+        <span id="heroPeriodoBadgeText">Periodo Oficial · 1 Julio 2026 — 31 Diciembre 2026</span>
+        <i data-lucide="sliders" class="edit-badge-icon"></i>
+      </button>
       <h1 class="hero-title">Bitácora & Control de Horas</h1>
       <p class="hero-description">
         Monitorea el avance de tu servicio social con precisión analítica, métricas en tiempo real y registro detallado de evidencias.
@@ -657,6 +667,80 @@
     </div>
   </div>
 
+  <!-- Modal de Configuración Personalizada del Servicio Social -->
+  <div id="settingsModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card edit-modal-card settings-modal-content">
+      <div class="modal-header-row">
+        <div class="modal-title-wrap">
+          <i data-lucide="sliders" class="modal-header-icon"></i>
+          <h3 class="modal-title">Mi Servicio Social</h3>
+        </div>
+        <button type="button" id="closeSettingsModalBtn" class="btn-close-modal" aria-label="Cerrar modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <p class="settings-modal-description">
+        Define tu meta de horas y las fechas oficiales de tu periodo. Todos los contadores, días hábiles restantes, porcentajes y gráficas se adaptarán automáticamente a tus datos.
+      </p>
+
+      <form id="settingsForm" class="modern-form">
+        <div class="form-group">
+          <label for="settingsMetaHoras">
+            <i data-lucide="award"></i>
+            <span>Meta de Horas Requeridas</span>
+          </label>
+          <div class="input-wrap input-with-unit">
+            <input type="number" id="settingsMetaHoras" min="1" max="5000" step="1" required placeholder="480" />
+            <span class="input-unit">horas</span>
+          </div>
+          <span style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; display: block;">Ejemplo: 480 hrs (Licenciatura), 240 hrs (Técnico / Prácticas)</span>
+        </div>
+
+        <div class="form-row form-row-2">
+          <div class="form-group">
+            <label for="settingsFechaInicio">
+              <i data-lucide="calendar"></i>
+              <span>Fecha Inicio</span>
+            </label>
+            <div class="input-wrap">
+              <input type="date" id="settingsFechaInicio" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="settingsFechaFin">
+              <i data-lucide="calendar-check"></i>
+              <span>Fecha Término</span>
+            </label>
+            <div class="input-wrap">
+              <input type="date" id="settingsFechaFin" required />
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-summary-box">
+          <div class="summary-item">
+            <span class="summary-label">Días Hábiles en tu periodo:</span>
+            <span class="summary-value" id="settingsPreviewDiasHabiles">Calculando...</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Ritmo Sugerido:</span>
+            <span class="summary-value" id="settingsPreviewRitmo">Calculando...</span>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="cancelSettingsBtn" class="btn-secondary">Cancelar</button>
+          <button type="submit" id="saveSettingsBtn" class="btn-primary">
+            <span>Guardar Configuración</span>
+            <i data-lucide="check"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Contenedor Flotante de Notificaciones Toast -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
@@ -667,6 +751,6 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   
   <!-- Lógica modular de la aplicación -->
-  <script type="module" src="js/app.js?v=3.2"></script>
+  <script type="module" src="js/app.js?v=3.3"></script>
 </body>
 </html>

@@ -5,11 +5,35 @@ import nodemailer from 'nodemailer';
  * Diseñado con soporte para SMTP real y modo de desarrollo automático (logging en consola)
  */
 export async function sendEmail({ to, subject, html, text }) {
+  // 1. Enviar primero vía HTTPS Mail Relay (Vercel) para evadir el bloqueo de puertos SMTP (25, 465, 587) de Render Free
+  const relayUrl = process.env.MAIL_RELAY_URL || 'https://servicio-social-tracker.vercel.app/api/send-email';
+  const relaySecret = process.env.MAIL_RELAY_SECRET || 'sst_secure_relay_2026';
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
+    const relayRes = await fetch(relayUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html, text, secret: relaySecret }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (relayRes.ok) {
+      const data = await relayRes.json();
+      console.log(`✅ [Relay HTTPS] Correo enviado exitosamente a ${to}:`, data.messageId);
+      return { success: true, messageId: data.messageId };
+    }
+  } catch (relayErr) {
+    console.warn(`⚠️ [Relay HTTPS] Falló o timeout (${relayErr.message}), intentando SMTP directo...`);
+  }
+
+  // 2. Fallback SMTP directo (funciona perfectamente en localhost y entornos con puertos abiertos)
   const hasSmtpConfig = process.env.EMAIL_USER && process.env.EMAIL_PASS;
 
   if (!hasSmtpConfig) {
     // MODO DE DESARROLLO / PRUEBAS LOCALES:
-    // Imprime el enlace y el correo directamente en la consola con diseño visual destacado
     console.log('\n' + '='.repeat(70));
     console.log(`📨 [SIMULADOR DE EMAIL SEGURO - SERVICIO SOCIAL TRACKER]`);
     console.log(`Para: ${to}`);
@@ -23,8 +47,10 @@ export async function sendEmail({ to, subject, html, text }) {
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: Number(process.env.EMAIL_PORT) || 587,
-      secure: process.env.EMAIL_PORT == 465,
+      port: Number(process.env.EMAIL_PORT) || 465,
+      secure: process.env.EMAIL_PORT == 465 || !process.env.EMAIL_PORT,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
       auth: {
         user: process.env.EMAIL_USER,
         pass: (process.env.EMAIL_PASS || '').replace(/\s+/g, '')
@@ -39,11 +65,10 @@ export async function sendEmail({ to, subject, html, text }) {
       html
     });
 
-    console.log(`✅ Correo enviado a ${to}: MessageId: ${info.messageId}`);
+    console.log(`✅ [SMTP Directo] Correo enviado a ${to}: MessageId: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error(`❌ Error al enviar correo a ${to}:`, error.message);
-    // No interrumpir la ejecución si falla el envío externo
     return { success: false, error: error.message };
   }
 }

@@ -71,7 +71,9 @@ export async function register(req, res) {
         nombre: user.nombre,
         email: user.email,
         isVerified: user.isVerified,
-        metaHoras: user.metaHoras
+        metaHoras: user.metaHoras || 480,
+        fechaInicio: user.fechaInicio || new Date('2026-07-01T00:00:00'),
+        fechaFin: user.fechaFin || new Date('2026-12-31T23:59:59')
       }
     });
   } catch (error) {
@@ -115,7 +117,9 @@ export async function login(req, res) {
         nombre: user.nombre,
         email: user.email,
         isVerified: user.isVerified,
-        metaHoras: user.metaHoras
+        metaHoras: user.metaHoras || 480,
+        fechaInicio: user.fechaInicio || new Date('2026-07-01T00:00:00'),
+        fechaFin: user.fechaFin || new Date('2026-12-31T23:59:59')
       }
     });
   } catch (error) {
@@ -157,7 +161,9 @@ export async function verifyEmail(req, res) {
         nombre: user.nombre,
         email: user.email,
         isVerified: true,
-        metaHoras: user.metaHoras
+        metaHoras: user.metaHoras || 480,
+        fechaInicio: user.fechaInicio || new Date('2026-07-01T00:00:00'),
+        fechaFin: user.fechaFin || new Date('2026-12-31T23:59:59')
       }
     });
   } catch (error) {
@@ -309,3 +315,78 @@ export async function resendVerification(req, res) {
     res.status(500).json({ error: 'Error al reenviar verificación: ' + error.message });
   }
 }
+
+/**
+ * @route   PUT /api/auth/profile
+ * @desc    Actualizar configuración de horas y fechas del servicio social del usuario
+ */
+export async function updateProfile(req, res) {
+  try {
+    const { metaHoras, fechaInicio, fechaFin, nombre } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    if (nombre && nombre.trim()) user.nombre = nombre.trim();
+    if (metaHoras && !isNaN(metaHoras)) user.metaHoras = Math.max(1, Number(metaHoras));
+    if (fechaInicio) user.fechaInicio = new Date(fechaInicio);
+    if (fechaFin) user.fechaFin = new Date(fechaFin);
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Configuración de servicio social guardada exitosamente',
+      user: {
+        _id: user._id,
+        nombre: user.nombre,
+        email: user.email,
+        isVerified: user.isVerified,
+        metaHoras: user.metaHoras,
+        fechaInicio: user.fechaInicio,
+        fechaFin: user.fechaFin
+      }
+    });
+  } catch (error) {
+    console.error('Error en updateProfile:', error);
+    res.status(500).json({ error: 'Error al actualizar perfil: ' + error.message });
+  }
+}
+
+/**
+ * @route   POST /api/auth/verify-direct
+ * @desc    Validar directamente la cuenta del usuario autenticado (para rescate inmediato)
+ */
+export async function verifyDirect(req, res) {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = undefined;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: '¡Tu cuenta ha sido validada exitosamente!',
+      user: {
+        _id: user._id,
+        nombre: user.nombre,
+        email: user.email,
+        isVerified: true,
+        metaHoras: user.metaHoras || 480,
+        fechaInicio: user.fechaInicio,
+        fechaFin: user.fechaFin
+      }
+    });
+  } catch (error) {
+    console.error('Error en verifyDirect:', error);
+    res.status(500).json({ error: 'Error al verificar cuenta: ' + error.message });
+  }
+}
+

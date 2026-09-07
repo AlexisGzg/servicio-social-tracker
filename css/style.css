@@ -305,6 +305,32 @@ html[data-theme="light"] .moon-icon {
   margin-bottom: 1rem;
 }
 
+.hero-badge.hero-badge-btn {
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.hero-badge.hero-badge-btn:hover {
+  border-color: var(--border-card-hover);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.edit-badge-icon {
+  width: 12px;
+  height: 12px;
+  opacity: 0.6;
+  margin-left: 0.35rem;
+  transition: opacity 0.2s ease;
+}
+
+.hero-badge.hero-badge-btn:hover .edit-badge-icon {
+  opacity: 1;
+}
+
 .hero-badge i {
   width: 14px;
   height: 14px;
@@ -1743,9 +1769,80 @@ html[data-theme="light"] .user-dropdown-menu {
   border-color: rgba(234, 179, 8, 0.6);
 }
 
+.btn-banner-action.btn-banner-success {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+}
+
+.btn-banner-action.btn-banner-success:hover {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: #10b981;
+  color: #ffffff;
+}
+
 .btn-banner-action i {
   width: 13px;
   height: 13px;
+}
+
+/* Modal de Configuración Personalizada */
+.settings-modal-content {
+  max-width: 480px;
+}
+
+.settings-modal-description {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+
+.input-with-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-unit input {
+  padding-right: 4.5rem;
+}
+
+.input-unit {
+  position: absolute;
+  right: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.settings-summary-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+}
+
+.summary-label {
+  color: var(--text-muted);
+}
+
+.summary-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .btn-close-banner:hover {

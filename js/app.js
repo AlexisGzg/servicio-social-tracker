@@ -18,16 +18,79 @@ import {
   verifyEmail,
   resendVerification,
   fetchCurrentUserProfile,
+  updateUserProfile,
+  verifyDirectUser,
   onAuthChange
-} from './api.js?v=3.2';
+} from './api.js?v=3.3';
 
 // ==========================================================================
-// Constantes y Configuración del Servicio Social
+// Constantes por Defecto y Formateadores de Fecha
 // ==========================================================================
-const META_HORAS = 480;
-const FECHA_INICIO = new Date('2026-07-01T00:00:00');
-const FECHA_FIN = new Date('2026-12-31T23:59:59');
+const META_HORAS_DEFAULT = 480;
+const FECHA_INICIO_DEFAULT = new Date('2026-07-01T00:00:00');
+const FECHA_FIN_DEFAULT = new Date('2026-12-31T23:59:59');
 const CIRCUNFERENCIA = 2 * Math.PI * 92; // r = 92 en el SVG -> ~578.05
+
+const MESES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function formatDateShort(dateObj) {
+  const d = new Date(dateObj);
+  return `${d.getDate()} ${MESES_CORTO[d.getMonth()]}`;
+}
+
+function formatDateLong(dateObj) {
+  const d = new Date(dateObj);
+  return `${d.getDate()} ${MESES_LARGO[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function toInputDateFormat(dateObj) {
+  const d = new Date(dateObj);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getUserSettings() {
+  const user = getCurrentUser();
+  let guestSettings = null;
+  try {
+    const raw = localStorage.getItem('sst_guest_settings');
+    if (raw) guestSettings = JSON.parse(raw);
+  } catch (e) {}
+
+  const current = user || guestSettings || {};
+  const metaHoras = Number(current.metaHoras) || META_HORAS_DEFAULT;
+
+  let fechaInicio = current.fechaInicio ? new Date(current.fechaInicio) : new Date(FECHA_INICIO_DEFAULT);
+  let fechaFin = current.fechaFin ? new Date(current.fechaFin) : new Date(FECHA_FIN_DEFAULT);
+
+  if (isNaN(fechaInicio.getTime())) fechaInicio = new Date(FECHA_INICIO_DEFAULT);
+  if (isNaN(fechaFin.getTime())) fechaFin = new Date(FECHA_FIN_DEFAULT);
+
+  return { metaHoras, fechaInicio, fechaFin };
+}
+
+function calculateBusinessDays(startDate, endDate) {
+  let cursor = new Date(startDate);
+  cursor.setHours(0, 0, 0, 0);
+
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  if (cursor > end) return 0;
+
+  let count = 0;
+  while (cursor <= end) {
+    const day = cursor.getDay();
+    if (day !== 0 && day !== 6) {
+      count++;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
 
 // Variables globales de estado
 let allActivities = [];
@@ -143,6 +206,21 @@ const editEvidenciaUrlInput = document.getElementById('editEvidenciaUrl');
 const closeEditModalBtn = document.getElementById('closeEditModalBtn');
 const cancelEditBtn = document.getElementById('cancelEditBtn');
 
+// Modal de Configuración Personalizada
+const settingsModal = document.getElementById('settingsModal');
+const closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
+const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
+const openSettingsBtn = document.getElementById('openSettingsBtn');
+const heroPeriodoBadgeBtn = document.getElementById('heroPeriodoBadgeBtn');
+const settingsForm = document.getElementById('settingsForm');
+const settingsMetaHoras = document.getElementById('settingsMetaHoras');
+const settingsFechaInicio = document.getElementById('settingsFechaInicio');
+const settingsFechaFin = document.getElementById('settingsFechaFin');
+const settingsPreviewDiasHabiles = document.getElementById('settingsPreviewDiasHabiles');
+const settingsPreviewRitmo = document.getElementById('settingsPreviewRitmo');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const btnValidateDirect = document.getElementById('btnValidateDirect');
+
 // Toast Container
 const toastContainer = document.getElementById('toastContainer');
 
@@ -174,8 +252,9 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAuthUI(user);
   });
 
-  // Inicializar eventos de autenticación
+  // Inicializar eventos de autenticación y configuración
   initAuthEvents();
+  initSettingsEvents();
 
   // Revisar si existen parámetros de verificación o reset en la URL
   handleUrlAuthParams();
@@ -347,13 +426,16 @@ async function loadApp(isInitialLoad = false) {
 // Renderizado de KPIs y Métricas
 // ==========================================================================
 function renderKPIs(activities) {
-  const target = getTargetHours();
+  const settings = getUserSettings();
+  const target = settings.metaHoras;
   const totalHoras = activities.reduce((sum, a) => sum + Number(a.horas || 0), 0);
   const porcentaje = Math.min((totalHoras / target) * 100, 100);
   const horasRestantes = Math.max(target - totalHoras, 0);
 
   // Animación del número de Horas Totales
   animateNumber(kpiHorasTotales, totalHoras, 1, false);
+  const kpiTargetUnit = document.getElementById('kpiTargetUnit');
+  if (kpiTargetUnit) kpiTargetUnit.textContent = `/ ${target} hrs`;
   kpiProgressBar.style.width = `${porcentaje}%`;
   kpiPorcentajeText.textContent = `${porcentaje.toFixed(1)}% completado`;
 
@@ -369,35 +451,37 @@ function renderKPIs(activities) {
   const numSemanasActivas = Object.keys(semanasMap).length || 1;
   const ritmo = totalHoras > 0 ? (totalHoras / numSemanasActivas).toFixed(1) : '0.0';
   kpiRitmoSemanal.textContent = ritmo;
+
+  renderDaysRemaining();
 }
 
 function renderDaysRemaining() {
-  // Contabilizar estrictamente los días de Lunes a Viernes del 1 de julio al 31 de diciembre de 2026
-  let fechaCursor = new Date(FECHA_INICIO);
-  fechaCursor.setHours(0, 0, 0, 0);
+  const settings = getUserSettings();
+  const diasHabilesTotales = calculateBusinessDays(settings.fechaInicio, settings.fechaFin);
 
-  const finNormalizado = new Date(FECHA_FIN);
-  finNormalizado.setHours(23, 59, 59, 999);
+  animateNumber(kpiDiasRestantes, diasHabilesTotales, 1, false);
 
-  let diasHabilesTotales = 0;
-  while (fechaCursor <= finNormalizado) {
-    const diaSemana = fechaCursor.getDay(); // 0 = Domingo, 6 = Sábado
-    // Contar exclusivamente Lunes a Viernes (días hábiles oficiales, sin descontar ningún festivo)
-    if (diaSemana !== 0 && diaSemana !== 6) {
-      diasHabilesTotales++;
-    }
-    fechaCursor.setDate(fechaCursor.getDate() + 1);
+  const kpiDiasSubtext = document.getElementById('kpiDiasSubtext');
+  if (kpiDiasSubtext) {
+    const fmtStart = formatDateShort(settings.fechaInicio);
+    const fmtEnd = formatDateShort(settings.fechaFin);
+    kpiDiasSubtext.textContent = `Lunes a Viernes · ${fmtStart} al ${fmtEnd}`;
   }
 
-  // Son exactamente 132 días hábiles
-  animateNumber(kpiDiasRestantes, diasHabilesTotales, 1, false);
+  const heroPeriodoBadgeText = document.getElementById('heroPeriodoBadgeText');
+  if (heroPeriodoBadgeText) {
+    const fmtStartFull = formatDateLong(settings.fechaInicio);
+    const fmtEndFull = formatDateLong(settings.fechaFin);
+    heroPeriodoBadgeText.textContent = `Periodo Oficial · ${fmtStartFull} — ${fmtEndFull}`;
+  }
 }
 
 // ==========================================================================
 // Dial Circular de Progreso con GSAP
 // ==========================================================================
 function renderProgress(activities) {
-  const target = getTargetHours();
+  const settings = getUserSettings();
+  const target = settings.metaHoras;
   const totalHoras = activities.reduce((sum, a) => sum + Number(a.horas || 0), 0);
   const porcentaje = Math.min((totalHoras / target) * 100, 100);
 
@@ -423,6 +507,8 @@ function renderProgress(activities) {
   });
 
   circleHoras.textContent = `${totalHoras} / ${target} hrs`;
+  const dialMetaBadge = document.getElementById('dialMetaBadge');
+  if (dialMetaBadge) dialMetaBadge.textContent = `Meta ${target} hrs`;
 
   // Subtexto motivacional según el progreso
   if (porcentaje === 0) {
@@ -1413,5 +1499,192 @@ async function handleUrlAuthParams() {
     resetTokenValue.value = resetToken;
     openAuthModal('reset');
     window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
+// ==========================================================================
+// Configuración Personalizada del Servicio Social (Metas y Fechas)
+// ==========================================================================
+function openSettingsModal() {
+  if (!settingsModal) return;
+  const settings = getUserSettings();
+  if (settingsMetaHoras) settingsMetaHoras.value = settings.metaHoras;
+  if (settingsFechaInicio) settingsFechaInicio.value = toInputDateFormat(settings.fechaInicio);
+  if (settingsFechaFin) settingsFechaFin.value = toInputDateFormat(settings.fechaFin);
+
+  updateSettingsPreview();
+  settingsModal.classList.add('is-open');
+  settingsModal.setAttribute('aria-hidden', 'false');
+  refreshIcons();
+}
+
+function closeSettingsModal() {
+  if (!settingsModal) return;
+  settingsModal.classList.remove('is-open');
+  settingsModal.setAttribute('aria-hidden', 'true');
+}
+
+function updateSettingsPreview() {
+  const meta = parseFloat(settingsMetaHoras?.value) || 0;
+  const startStr = settingsFechaInicio?.value;
+  const endStr = settingsFechaFin?.value;
+
+  if (!startStr || !endStr) {
+    if (settingsPreviewDiasHabiles) settingsPreviewDiasHabiles.textContent = '--';
+    if (settingsPreviewRitmo) settingsPreviewRitmo.textContent = '--';
+    return;
+  }
+
+  const startDate = new Date(startStr + 'T00:00:00');
+  const endDate = new Date(endStr + 'T23:59:59');
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || startDate > endDate) {
+    if (settingsPreviewDiasHabiles) settingsPreviewDiasHabiles.textContent = 'Fecha inválida';
+    if (settingsPreviewRitmo) settingsPreviewRitmo.textContent = 'Revisa las fechas';
+    return;
+  }
+
+  const businessDays = calculateBusinessDays(startDate, endDate);
+  if (settingsPreviewDiasHabiles) {
+    settingsPreviewDiasHabiles.textContent = `${businessDays} días`;
+  }
+
+  if (settingsPreviewRitmo) {
+    if (businessDays > 0 && meta > 0) {
+      const horasPorDia = (meta / businessDays).toFixed(1);
+      const horasPorSemana = ((meta / businessDays) * 5).toFixed(1);
+      settingsPreviewRitmo.textContent = `${horasPorDia} hrs/día (~${horasPorSemana} hrs/sem)`;
+    } else {
+      settingsPreviewRitmo.textContent = '--';
+    }
+  }
+}
+
+function initSettingsEvents() {
+  if (openSettingsBtn) {
+    openSettingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (userNavProfile) userNavProfile.classList.remove('menu-open');
+      openSettingsModal();
+    });
+  }
+
+  if (heroPeriodoBadgeBtn) {
+    heroPeriodoBadgeBtn.addEventListener('click', () => {
+      openSettingsModal();
+    });
+  }
+
+  if (closeSettingsModalBtn) {
+    closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+  }
+
+  if (cancelSettingsBtn) {
+    cancelSettingsBtn.addEventListener('click', closeSettingsModal);
+  }
+
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) {
+        closeSettingsModal();
+      }
+    });
+  }
+
+  // Actualización en tiempo real de preview de días hábiles y ritmo
+  if (settingsMetaHoras) settingsMetaHoras.addEventListener('input', updateSettingsPreview);
+  if (settingsFechaInicio) settingsFechaInicio.addEventListener('change', updateSettingsPreview);
+  if (settingsFechaFin) settingsFechaFin.addEventListener('change', updateSettingsPreview);
+
+  // Guardar configuración
+  if (settingsForm) {
+    settingsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const meta = parseInt(settingsMetaHoras.value, 10);
+      const startStr = settingsFechaInicio.value;
+      const endStr = settingsFechaFin.value;
+
+      if (isNaN(meta) || meta <= 0) {
+        showToast('Introduce una meta válida de horas', 'error');
+        return;
+      }
+
+      if (!startStr || !endStr) {
+        showToast('Selecciona ambas fechas del periodo', 'error');
+        return;
+      }
+
+      const startDate = new Date(startStr + 'T00:00:00');
+      const endDate = new Date(endStr + 'T23:59:59');
+
+      if (startDate > endDate) {
+        showToast('La fecha de inicio debe ser anterior a la de término', 'error');
+        return;
+      }
+
+      if (saveSettingsBtn) {
+        saveSettingsBtn.disabled = true;
+        saveSettingsBtn.innerHTML = `<span>Guardando...</span>`;
+      }
+
+      try {
+        const user = getCurrentUser();
+        if (user) {
+          // Usuario autenticado: Guardar en backend MongoDB
+          const updatedUser = await updateUserProfile({
+            metaHoras: meta,
+            fechaInicio: startStr,
+            fechaFin: endStr
+          });
+          updateAuthUI(updatedUser);
+        } else {
+          // Modo Invitado: Guardar localmente
+          const guestSettings = {
+            metaHoras: meta,
+            fechaInicio: startStr,
+            fechaFin: endStr
+          };
+          localStorage.setItem('sst_guest_settings', JSON.stringify(guestSettings));
+        }
+
+        closeSettingsModal();
+        await loadApp(false);
+        showToast('¡Configuración de tu servicio social actualizada con éxito!', 'success');
+      } catch (err) {
+        console.error('Error al guardar configuración:', err);
+        showToast(err.message || 'Error al guardar la configuración', 'error');
+      } finally {
+        if (saveSettingsBtn) {
+          saveSettingsBtn.disabled = false;
+          saveSettingsBtn.innerHTML = `<span>Guardar Configuración</span><i data-lucide="check"></i>`;
+          refreshIcons();
+        }
+      }
+    });
+  }
+
+  // Validación Directa desde Banner
+  if (btnValidateDirect) {
+    btnValidateDirect.addEventListener('click', async () => {
+      btnValidateDirect.disabled = true;
+      const origHtml = btnValidateDirect.innerHTML;
+      btnValidateDirect.innerHTML = `<span>Validando...</span>`;
+
+      try {
+        const data = await verifyDirectUser();
+        if (data && data.user) {
+          updateAuthUI(data.user);
+        }
+        showToast('¡Cuenta verificada exitosamente! Ya tienes acceso completo.', 'success');
+        if (unverifiedEmailBanner) unverifiedEmailBanner.style.display = 'none';
+      } catch (err) {
+        console.error('Error al validar directamente:', err);
+        showToast(err.message || 'Error al validar la cuenta', 'error');
+      } finally {
+        btnValidateDirect.disabled = false;
+        btnValidateDirect.innerHTML = origHtml;
+        refreshIcons();
+      }
+    });
   }
 }

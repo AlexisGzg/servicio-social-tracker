@@ -271,6 +271,58 @@ export async function fetchCurrentUserProfile() {
   return getCurrentUser();
 }
 
+export async function updateUserProfile({ metaHoras, fechaInicio, fechaFin, nombre }) {
+  const token = getToken();
+
+  if (token) {
+    try {
+      const res = await fetch(`${API_BASE}/auth/profile`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ metaHoras, fechaInicio, fechaFin, nombre })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al guardar configuración');
+      }
+
+      setCurrentUser(data.user);
+      return data.user;
+    } catch (err) {
+      console.warn('Error al actualizar en backend, guardando localmente:', err);
+    }
+  }
+
+  // Guardado local si está offline o usuario invitado
+  const user = getCurrentUser() || { _id: 'guest', nombre: 'Invitado' };
+  user.metaHoras = Number(metaHoras) || 480;
+  if (fechaInicio) user.fechaInicio = fechaInicio;
+  if (fechaFin) user.fechaFin = fechaFin;
+  if (nombre) user.nombre = nombre;
+  setCurrentUser(user);
+  localStorage.setItem('sst_guest_settings', JSON.stringify(user));
+  return user;
+}
+
+export async function verifyDirectUser() {
+  const token = getToken();
+  if (!token) throw new Error('Debes iniciar sesión para validar tu cuenta.');
+
+  const res = await fetch(`${API_BASE}/auth/verify-direct`, {
+    method: 'POST',
+    headers: getAuthHeaders()
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Error al validar cuenta');
+  }
+
+  setCurrentUser(data.user);
+  return data;
+}
+
 // ==========================================================================
 // Helpers de Almacenamiento Local (Aislado por Usuario)
 // ==========================================================================
