@@ -88,7 +88,15 @@ html[data-theme="light"] {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+/* Optimización táctil y rendimiento de renderizado */
+button, a, input, select, textarea, .kpi-card, .btn-chip, .filter-chip, .user-profile-btn {
+  touch-action: manipulation;
+}
+
+body, .navbar, .kpi-card, .chart-card, .entry-card, .modal-content, .status-badge {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 body {
@@ -127,6 +135,8 @@ body {
    Navegación Superior (Navbar)
    -------------------------------------------------------------------------- */
 .navbar {
+  position: relative;
+  z-index: 500;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1497,6 +1507,7 @@ html[data-theme="light"] .input-wrap textarea:focus {
 /* Menú de Perfil en Navbar */
 .user-nav-profile {
   position: relative;
+  z-index: 600;
 }
 
 .user-profile-btn {
@@ -1511,8 +1522,8 @@ html[data-theme="light"] .input-wrap textarea:focus {
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
+  touch-action: manipulation;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .user-profile-btn:hover {
@@ -1552,26 +1563,31 @@ html[data-theme="light"] .input-wrap textarea:focus {
   transform: rotate(180deg);
 }
 
-/* Dropdown del Menú de Usuario */
+/* Dropdown del Menú de Usuario - 100% Sólido, Opaco, Máxima Prioridad de Capa */
 .user-dropdown-menu {
   position: absolute;
   top: calc(100% + 0.65rem);
   right: 0;
-  width: 250px;
-  background: var(--bg-card);
-  backdrop-filter: blur(24px);
-  border: 1px solid var(--border-card-hover);
+  width: 260px;
+  background-color: #16161a !important; /* Totalmente sólido en modo oscuro: nunca se transparentan las letras */
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 16px;
-  box-shadow: 0 15px 40px -8px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.1);
   padding: 0.85rem;
-  z-index: 1000;
+  z-index: 99999 !important;
   display: none;
   flex-direction: column;
-  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html[data-theme="light"] .user-dropdown-menu {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .user-nav-profile.menu-open .user-dropdown-menu {
-  display: flex;
+  display: flex !important;
 }
 
 .user-dropdown-header {
@@ -1625,6 +1641,7 @@ html[data-theme="light"] .input-wrap textarea:focus {
   color: var(--text-secondary);
   cursor: pointer;
   text-align: left;
+  touch-action: manipulation;
   transition: all 0.15s ease;
 }
 
@@ -1638,9 +1655,21 @@ html[data-theme="light"] .input-wrap textarea:focus {
   height: 15px;
 }
 
-.dropdown-item.logout-item:hover {
-  background: rgba(239, 68, 68, 0.1);
+.dropdown-item.logout-item {
+  margin-top: 0.25rem;
+  padding: 0.75rem 0.75rem;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.dropdown-item.logout-item:hover,
+.dropdown-item.logout-item:active {
+  background: rgba(239, 68, 68, 0.18);
   color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* Banner de Aviso de Verificación de Correo */
@@ -2079,7 +2108,22 @@ html[data-theme="light"] .input-wrap textarea:focus {
   }
 
   .user-dropdown-menu {
-    width: min(280px, calc(100vw - 2rem));
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    width: min(290px, calc(100vw - 1.5rem));
+  }
+
+  /* Rendimiento GPU en móvil: Desactivar filtros de desenfoque costosos para 60fps */
+  .kpi-card,
+  .chart-card,
+  .entry-card,
+  .modal-content,
+  .status-badge,
+  .analytics-header-card,
+  .unverified-banner {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   .hero-title {

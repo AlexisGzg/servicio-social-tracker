@@ -57,11 +57,11 @@ export function onAuthChange(callback) {
   callback(getCurrentUser());
 }
 
-// Comprobar salud del backend con timeout
+// Comprobar salud del backend con timeout de 5 segundos
 export async function checkBackendHealth() {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1800);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(`${API_BASE}/health`, { signal: controller.signal });
     clearTimeout(timeoutId);
     const ok = res.ok;
@@ -120,50 +120,66 @@ function getAuthHeaders() {
 }
 
 // ==========================================================================
-// Métodos de Autenticación
+// Métodos de Autenticación (Directos, sin doble latencia de health-check)
 // ==========================================================================
 export async function registerUser({ nombre, email, password }) {
-  const isUp = await checkBackendHealth();
-  if (!isUp) {
-    throw new Error('El servidor no está disponible. Por favor enciende el backend para crear tu cuenta.');
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, email, password }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Error al registrar usuario');
+    }
+
+    notifyStatus(true);
+    setToken(data.token);
+    setCurrentUser(data.user);
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError' || err.message?.includes('Failed to fetch')) {
+      notifyStatus(false);
+      throw new Error('No se pudo conectar con el servidor. Si estuvo inactivo, puede estar despertando; reintenta en un momento.');
+    }
+    throw err;
   }
-
-  const res = await fetch(`${API_BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre, email, password })
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Error al registrar usuario');
-  }
-
-  setToken(data.token);
-  setCurrentUser(data.user);
-  return data;
 }
 
 export async function loginUser({ email, password }) {
-  const isUp = await checkBackendHealth();
-  if (!isUp) {
-    throw new Error('El servidor no está disponible. Por favor enciende el backend para iniciar sesión.');
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Credenciales incorrectas');
+    }
+
+    notifyStatus(true);
+    setToken(data.token);
+    setCurrentUser(data.user);
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError' || err.message?.includes('Failed to fetch')) {
+      notifyStatus(false);
+      throw new Error('No se pudo conectar con el servidor. Si estuvo inactivo, puede estar despertando; reintenta en un momento.');
+    }
+    throw err;
   }
-
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Error al iniciar sesión');
-  }
-
-  setToken(data.token);
-  setCurrentUser(data.user);
-  return data;
 }
 
 export function logoutUser() {
@@ -263,7 +279,7 @@ function getLocalKey() {
   return user ? `sst_acts_${user._id}` : 'sst_acts_guest';
 }
 
-function getLocalStore() {
+export function getLocalStore() {
   try {
     const raw = localStorage.getItem(getLocalKey());
     return raw ? JSON.parse(raw) : [];
@@ -281,41 +297,43 @@ function saveLocalStore(items) {
 }
 
 // ==========================================================================
-// Operaciones CRUD de Actividades (Protegidas por JWT)
+// Operaciones CRUD de Actividades (Protegidas por JWT con Respuesta Directa)
 // ==========================================================================
 export async function getActivities() {
-  const backendUp = await checkBackendHealth();
   const token = getToken();
 
-  if (backendUp && token) {
+  if (token) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(`${API_BASE}/activities`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (res.status === 401) {
-        // Sesión expirada
         logoutUser();
         throw new Error('Sesión expirada. Por favor inicia sesión nuevamente.');
       }
 
       if (res.ok) {
+        notifyStatus(true);
         const data = await res.json();
-        // Mantener actividades locales pendientes si existen
         const local = getLocalStore();
-        const pending = local.filter((it) => it._id && it._id.startsWith('local_'));
+        const pending = local.filter((it) => it._id && String(it._id).startsWith('local_'));
         const combined = [...pending, ...data];
         saveLocalStore(combined);
         return combined.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
       }
     } catch (e) {
-      if (e.message.includes('Sesión expirada')) throw e;
+      if (e.message?.includes('Sesión expirada')) throw e;
       console.warn('Fallo al obtener del backend, recurriendo a local:', e);
+      notifyStatus(false);
     }
   }
 
-  // Fallback a localStorage
-  notifyStatus(false);
+  // Fallback a localStorage (inmediato, 0ms de espera)
   const items = getLocalStore();
   return items.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 }
@@ -323,13 +341,17 @@ export async function getActivities() {
 export async function createActivity(data) {
   const token = getToken();
 
-  if (isBackendAvailable && token) {
+  if (token) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(`${API_BASE}/activities`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (res.status === 401) {
         logoutUser();
@@ -337,6 +359,7 @@ export async function createActivity(data) {
       }
 
       if (res.ok) {
+        notifyStatus(true);
         const created = await res.json();
         const local = getLocalStore();
         local.unshift(created);
@@ -344,8 +367,9 @@ export async function createActivity(data) {
         return created;
       }
     } catch (e) {
-      if (e.message.includes('Sesión expirada')) throw e;
+      if (e.message?.includes('Sesión expirada')) throw e;
       console.warn('Fallo al crear en backend, guardando localmente:', e);
+      notifyStatus(false);
     }
   }
 
@@ -365,13 +389,17 @@ export async function createActivity(data) {
 export async function updateActivity(id, updatedData) {
   const token = getToken();
 
-  if (isBackendAvailable && token && !id.startsWith('local_')) {
+  if (token && !String(id).startsWith('local_')) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(`${API_BASE}/activities/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify(updatedData)
+        body: JSON.stringify(updatedData),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (res.status === 401) {
         logoutUser();
@@ -379,14 +407,16 @@ export async function updateActivity(id, updatedData) {
       }
 
       if (res.ok) {
+        notifyStatus(true);
         const updated = await res.json();
         const local = getLocalStore().map((item) => (item._id === id ? updated : item));
         saveLocalStore(local);
         return updated;
       }
     } catch (e) {
-      if (e.message.includes('Sesión expirada')) throw e;
+      if (e.message?.includes('Sesión expirada')) throw e;
       console.warn('Fallo al actualizar en backend, actualizando localmente:', e);
+      notifyStatus(false);
     }
   }
 
@@ -404,12 +434,16 @@ export async function updateActivity(id, updatedData) {
 export async function deleteActivity(id) {
   const token = getToken();
 
-  if (isBackendAvailable && token && !id.startsWith('local_')) {
+  if (token && !String(id).startsWith('local_')) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(`${API_BASE}/activities/${id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (res.status === 401) {
         logoutUser();
@@ -417,13 +451,15 @@ export async function deleteActivity(id) {
       }
 
       if (res.ok) {
+        notifyStatus(true);
         const local = getLocalStore().filter((item) => item._id !== id);
         saveLocalStore(local);
         return { message: 'Eliminado con éxito' };
       }
     } catch (e) {
-      if (e.message.includes('Sesión expirada')) throw e;
+      if (e.message?.includes('Sesión expirada')) throw e;
       console.warn('Fallo al eliminar en backend, eliminando localmente:', e);
+      notifyStatus(false);
     }
   }
 

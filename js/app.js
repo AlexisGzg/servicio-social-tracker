@@ -9,6 +9,7 @@ import {
   syncPendingActivities,
   getStatus,
   getCurrentUser,
+  getLocalStore,
   loginUser,
   registerUser,
   logoutUser,
@@ -18,7 +19,7 @@ import {
   resendVerification,
   fetchCurrentUserProfile,
   onAuthChange
-} from './api.js?v=3.1';
+} from './api.js?v=3.2';
 
 // ==========================================================================
 // Constantes y Configuración del Servicio Social
@@ -307,10 +308,24 @@ if (btnSyncNow) {
 }
 
 // ==========================================================================
-// Carga Principal de la Aplicación
+// Carga Principal de la Aplicación (Caché Inmediato 0ms + Actualización en Fondo)
 // ==========================================================================
 async function loadApp(isInitialLoad = false) {
   try {
+    // 1. Renderizado ultrarrápido desde almacenamiento local para respuesta instantánea (0ms)
+    if (isInitialLoad) {
+      const cached = getLocalStore();
+      if (cached && cached.length > 0) {
+        allActivities = cached;
+        renderKPIs(allActivities);
+        renderProgress(allActivities);
+        renderChart(allActivities);
+        applyFilters();
+        updateSyncBanner();
+      }
+    }
+
+    // 2. Cargar datos en la nube sin bloquear la interfaz
     allActivities = await getActivities();
     
     renderKPIs(allActivities);
@@ -971,6 +986,7 @@ function startVerificationPolling() {
   if (verificationPollTimer) return;
   refreshVerificationStatus();
   verificationPollTimer = setInterval(async () => {
+    if (document.hidden) return; // Evitar llamadas innecesarias si la app está en segundo plano
     const user = getCurrentUser();
     if (!user || user.isVerified) {
       stopVerificationPolling();
@@ -980,7 +996,7 @@ function startVerificationPolling() {
     if (fresh?.isVerified) {
       showToast('¡Tu correo ha sido verificado con éxito!', 'success');
     }
-  }, 3000);
+  }, 6000);
 }
 
 function stopVerificationPolling() {
@@ -1119,26 +1135,44 @@ function initAuthEvents() {
 
   // Menú de usuario en navbar
   if (userProfileBtn && userNavProfile) {
-    userProfileBtn.addEventListener('click', (e) => {
+    const toggleMenu = (e) => {
       e.stopPropagation();
       userNavProfile.classList.toggle('menu-open');
-    });
+    };
+
+    userProfileBtn.addEventListener('click', toggleMenu);
 
     document.addEventListener('click', (e) => {
       if (!userNavProfile.contains(e.target)) {
         userNavProfile.classList.remove('menu-open');
       }
     });
+
+    document.addEventListener('touchend', (e) => {
+      if (!userNavProfile.contains(e.target)) {
+        userNavProfile.classList.remove('menu-open');
+      }
+    }, { passive: true });
   }
 
-  // Cerrar sesión
+  // Cerrar sesión con respuesta táctil instantánea y cierre inmediato del menú
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
+    const handleLogout = async (e) => {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+      if (userNavProfile) {
+        userNavProfile.classList.remove('menu-open');
+      }
       logoutUser();
       updateAuthUI(null);
       showToast('Has cerrado sesión correctamente', 'info');
       await loadApp(false);
-    });
+    };
+
+    logoutBtn.addEventListener('click', handleLogout);
+    logoutBtn.addEventListener('touchend', handleLogout);
   }
 
   // Cerrar banner de correo no verificado
