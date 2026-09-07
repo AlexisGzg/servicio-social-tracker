@@ -1,6 +1,6 @@
 // API Layer con soporte de Autenticación Segura (JWT + Bcrypt) y Resiliencia Local
 // Cuando despliegues tu backend (por ejemplo en Render), coloca aquí su URL pública:
-export const PROD_API_URL = 'https://tu-backend.onrender.com/api';
+export const PROD_API_URL = 'https://servicio-social-tracker.onrender.com/api';
 
 const isLocalhost = typeof window !== 'undefined' && (
   window.location.hostname === 'localhost' ||
