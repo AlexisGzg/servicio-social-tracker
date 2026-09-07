@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Servicio Social Tracker · Luxury Edition</title>
+  
+
+  <!-- Tipografía de alta gama: Playfair Display + Plus Jakarta Sans + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- Fondo dinámico con resplandor ambiental sutil -->
+  <div class="ambient-glow" aria-hidden="true"></div>
+
+  <!-- Contenedor Principal -->
+  <div class="app-wrapper">
+    
+    <!-- Barra Superior de Navegación y Estado -->
+    <header class="navbar" data-animate>
+      <div class="nav-brand">
+        <div class="brand-icon">
+          <i data-lucide="shield-check"></i>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">SERVICIO SOCIAL</span>
+          <span class="brand-subtitle">TRACKER EXECUTIVE</span>
+        </div>
+      </div>
+
+      <div class="nav-controls">
+        <!-- Indicador de conexión en vivo / local -->
+        <button id="serverStatusBadge" class="status-badge" title="Haz clic para comprobar conexión con el servidor">
+          <span class="status-dot"></span>
+          <span class="status-label">Comprobando...</span>
+          <i data-lucide="refresh-cw" class="status-refresh-icon"></i>
+        </button>
+
+        <!-- Botón de Iniciar Sesión (visible cuando no hay sesión activa) -->
+        <button id="openAuthModalBtn" class="btn-auth" title="Iniciar sesión o registrar cuenta">
+          <i data-lucide="user"></i>
+          <span>Acceder</span>
+        </button>
+
+        <!-- Menú de Perfil de Usuario (visible cuando hay sesión activa) -->
+        <div id="userNavProfile" class="user-nav-profile" style="display: none;">
+          <button type="button" id="userProfileBtn" class="user-profile-btn" aria-label="Menú de usuario" title="Ver mi cuenta">
+            <span class="user-avatar" id="navUserAvatar">U</span>
+            <span class="user-name" id="navUserName">Usuario</span>
+            <i data-lucide="chevron-down" class="chevron-icon"></i>
+          </button>
+          <div id="userDropdownMenu" class="user-dropdown-menu">
+            <div class="user-dropdown-header">
+              <span class="dropdown-user-name" id="dropdownUserName">Usuario</span>
+              <span class="dropdown-user-email" id="dropdownUserEmail">correo@ejemplo.com</span>
+              <span class="dropdown-user-status" id="dropdownUserVerified">● Correo verificado</span>
+            </div>
+            <div class="user-dropdown-divider"></div>
+            <button type="button" id="logoutBtn" class="dropdown-item logout-item">
+              <i data-lucide="log-out"></i>
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Selector de Tema (Oscuro / Claro) -->
+        <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="Cambiar tema de color" title="Alternar entre modo oscuro y claro">
+          <i data-lucide="moon" class="theme-icon moon-icon"></i>
+          <i data-lucide="sun" class="theme-icon sun-icon"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Banner de Aviso de Verificación de Correo (visible si el email no ha sido confirmado) -->
+    <div id="unverifiedEmailBanner" class="unverified-banner" style="display: none;">
+      <div class="unverified-banner-content">
+        <i data-lucide="mail-warning"></i>
+        <span>Por favor verifica tu correo para proteger tu cuenta. Si estás en modo local, puedes validarlo directamente aquí.</span>
+      </div>
+      <div class="unverified-banner-actions">
+        <button type="button" id="btnResendVerification" class="btn-banner-action" title="Reenviar correo o validar en modo local">
+          <i data-lucide="send"></i>
+          <span>Reenviar / Verificar</span>
+        </button>
+        <button type="button" id="closeUnverifiedBannerBtn" class="btn-close-banner" aria-label="Cerrar aviso"><i data-lucide="x"></i></button>
+      </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero-section" data-animate>
+      <div class="hero-badge">
+        <i data-lucide="calendar"></i>
+        <span>Periodo Oficial · 1 Julio 2026 — 31 Diciembre 2026</span>
+      </div>
+      <h1 class="hero-title">Bitácora & Control de Horas</h1>
+      <p class="hero-description">
+        Monitorea el avance de tu servicio social con precisión analítica, métricas en tiempo real y registro detallado de evidencias.
+      </p>
+    </section>
+
+    <!-- Banner de Sincronización a la nube (Visible cuando hay actividades locales y el backend está online) -->
+    <div id="syncAlertBanner" class="sync-banner" style="display: none;">
+      <div class="sync-banner-info">
+        <div class="sync-icon-circle">
+          <i data-lucide="cloud-upload"></i>
+        </div>
+        <span>Tienes <strong id="pendingSyncCount">0</strong> actividad(es) guardada(s) en tu laptop pendientes de subir</span>
+      </div>
+      <button type="button" id="btnSyncNow" class="btn-sync" title="Subir las actividades locales a MongoDB">
+        <i data-lucide="upload-cloud"></i>
+        <span>Subir a la nube</span>
+      </button>
+    </div>
+
+    <!-- Barra Ejecutiva de KPIs -->
+    <section class="kpi-grid" data-animate>
+      <!-- KPI 1: Horas Totales -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Horas Acumuladas</span>
+          <div class="kpi-icon-wrap"><i data-lucide="clock"></i></div>
+        </div>
+        <div class="kpi-body">
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpiHorasTotales">0</span>
+            <span class="kpi-unit">/ 480 hrs</span>
+          </div>
+          <div class="kpi-progress-bar">
+            <div class="kpi-progress-fill" id="kpiProgressBar" style="width: 0%;"></div>
+          </div>
+          <p class="kpi-subtext" id="kpiPorcentajeText">0% completado</p>
+        </div>
+      </div>
+
+      <!-- KPI 2: Horas Restantes -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Horas Restantes</span>
+          <div class="kpi-icon-wrap"><i data-lucide="target"></i></div>
+        </div>
+        <div class="kpi-body">
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpiHorasRestantes">480</span>
+            <span class="kpi-unit">hrs pendientes</span>
+          </div>
+          <p class="kpi-subtext" id="kpiMetaSubtext">Meta oficial requerida</p>
+        </div>
+      </div>
+
+      <!-- KPI 3: Ritmo Semanal -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Ritmo Promedio</span>
+          <div class="kpi-icon-wrap"><i data-lucide="trending-up"></i></div>
+        </div>
+        <div class="kpi-body">
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpiRitmoSemanal">0.0</span>
+            <span class="kpi-unit">hrs / semana</span>
+          </div>
+          <p class="kpi-subtext" id="kpiRitmoSubtext">Basado en semanas activas</p>
+        </div>
+      </div>
+
+      <!-- KPI 4: Días Hábiles del Periodo -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Días Hábiles</span>
+          <div class="kpi-icon-wrap"><i data-lucide="briefcase"></i></div>
+        </div>
+        <div class="kpi-body">
+          <div class="kpi-value-row">
+            <span class="kpi-value" id="kpiDiasRestantes">132</span>
+            <span class="kpi-unit">días hábiles</span>
+          </div>
+          <p class="kpi-subtext" id="kpiFechaFin">Lunes a Viernes · 1 Jul al 31 Dic (132 días)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grilla Superior: Dial Circular + Gráfica Semanal -->
+    <section class="analytics-grid">
+      
+      <!-- Tarjeta Dial Circular de Progreso -->
+      <div class="card dial-card" data-animate>
+        <div class="card-header">
+          <div class="card-title-group">
+            <i data-lucide="pie-chart" class="card-header-icon"></i>
+            <h2>Progreso Global</h2>
+          </div>
+          <span class="card-tag">Meta 480 hrs</span>
+        </div>
+
+        <div class="dial-container">
+          <div class="circle-wrapper">
+            <svg class="circle-progress" viewBox="0 0 220 220">
+              <defs>
+                <linearGradient id="circleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="var(--gradient-start)" />
+                  <stop offset="100%" stop-color="var(--gradient-end)" />
+                </linearGradient>
+              </defs>
+              <circle class="circle-bg" cx="110" cy="110" r="92" />
+              <circle class="circle-fill" id="circleFill" cx="110" cy="110" r="92" />
+            </svg>
+            <div class="circle-center-content">
+              <span class="circle-percent" id="circlePercent">0%</span>
+              <span class="circle-horas-counter" id="circleHoras">0 / 480 hrs</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dial-footer">
+          <div class="dial-status-pill" id="dialStatusPill">
+            <span class="pulse-dot"></span>
+            <span id="dialStatusText">Iniciando registro de actividades</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tarjeta Gráfico Semanal -->
+      <div class="card chart-card" data-animate>
+        <div class="card-header">
+          <div class="card-title-group">
+            <i data-lucide="bar-chart-3" class="card-header-icon"></i>
+            <h2>Distribución Semanal</h2>
+          </div>
+          <span class="card-tag">Horas acumuladas</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="weeklyChart"></canvas>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Grilla Inferior: Formulario de Registro + Bitácora / Historial -->
+    <section class="interaction-grid">
+      
+      <!-- Tarjeta Formulario -->
+      <div class="card form-card" data-animate>
+        <div class="card-header">
+          <div class="card-title-group">
+            <i data-lucide="plus-circle" class="card-header-icon"></i>
+            <h2>Registrar Actividad</h2>
+          </div>
+          <span class="card-tag">Nueva entrada</span>
+        </div>
+
+        <form id="activityForm" class="modern-form">
+          <div class="form-row form-row-2">
+            <!-- Campo Fecha -->
+            <div class="form-group">
+              <label for="fecha">
+                <i data-lucide="calendar"></i>
+                <span>Fecha de realización</span>
+              </label>
+              <div class="input-wrap">
+                <input type="date" id="fecha" required />
+              </div>
+            </div>
+
+            <!-- Campo Horas -->
+            <div class="form-group">
+              <label for="horas">
+                <i data-lucide="clock"></i>
+                <span>Horas dedicadas</span>
+              </label>
+              <div class="input-wrap">
+                <input type="number" id="horas" min="0.5" step="0.5" placeholder="Ej. 4" required />
+              </div>
+            </div>
+          </div>
+
+          <!-- Botones rápidos de horas -->
+          <div class="quick-hours-group">
+            <span class="quick-hours-label">Acceso rápido:</span>
+            <div class="quick-chips">
+              <button type="button" class="quick-chip" data-hours="1">+1h</button>
+              <button type="button" class="quick-chip" data-hours="2">+2h</button>
+              <button type="button" class="quick-chip" data-hours="4">+4h</button>
+              <button type="button" class="quick-chip" data-hours="6">+6h</button>
+              <button type="button" class="quick-chip" data-hours="8">+8h</button>
+            </div>
+          </div>
+
+          <!-- Campo Descripción -->
+          <div class="form-group">
+            <label for="descripcion">
+              <i data-lucide="file-text"></i>
+              <span>Descripción de actividades realizadas</span>
+            </label>
+            <div class="input-wrap">
+              <textarea id="descripcion" rows="3" placeholder="Detalla las tareas, entregables o actividades desarrolladas..." required></textarea>
+            </div>
+          </div>
+
+          <div class="form-row form-row-2">
+            <!-- Campo Lugar -->
+            <div class="form-group">
+              <label for="lugar">
+                <i data-lucide="map-pin"></i>
+                <span>Lugar / Dependencia</span>
+              </label>
+              <div class="input-wrap">
+                <input type="text" id="lugar" placeholder="Ej. Coordinación o Remoto" />
+              </div>
+            </div>
+
+            <!-- Campo Evidencia -->
+            <div class="form-group">
+              <label for="evidenciaUrl">
+                <i data-lucide="link-2"></i>
+                <span>Enlace a Evidencia (Drive/URL)</span>
+              </label>
+              <div class="input-wrap">
+                <input type="url" id="evidenciaUrl" placeholder="https://drive.google.com/..." />
+              </div>
+            </div>
+          </div>
+
+          <!-- Botón de Envío -->
+          <button type="submit" id="submitBtn" class="btn-primary">
+            <span class="btn-text">Guardar Actividad</span>
+            <i data-lucide="arrow-right" class="btn-icon"></i>
+          </button>
+        </form>
+      </div>
+
+      <!-- Tarjeta Bitácora / Lista de Actividades -->
+      <div class="card list-card" data-animate>
+        <div class="card-header">
+          <div class="card-title-group">
+            <i data-lucide="list-checks" class="card-header-icon"></i>
+            <h2>Bitácora de Actividades</h2>
+          </div>
+          <span class="card-tag" id="activityCountBadge">0 registros</span>
+        </div>
+
+        <!-- Barra de Búsqueda y Filtrado -->
+        <div class="search-filter-bar">
+          <div class="search-input-wrap">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="searchInput" placeholder="Buscar por descripción o lugar..." />
+            <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Limpiar búsqueda" style="display: none;">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtro Rápido por Mes -->
+        <div class="month-filter-group">
+          <span class="month-filter-label">Mes:</span>
+          <div class="month-chips" id="monthChips">
+            <button type="button" class="month-chip active" data-month="all">Todos</button>
+            <button type="button" class="month-chip" data-month="6">Jul</button>
+            <button type="button" class="month-chip" data-month="7">Ago</button>
+            <button type="button" class="month-chip" data-month="8">Sep</button>
+            <button type="button" class="month-chip" data-month="9">Oct</button>
+            <button type="button" class="month-chip" data-month="10">Nov</button>
+            <button type="button" class="month-chip" data-month="11">Dic</button>
+          </div>
+          <span id="monthHoursSummary" class="month-hours-summary"></span>
+        </div>
+
+        <!-- Lista de Actividades -->
+        <div class="list-container">
+          <ul id="activityList" class="activities-feed">
+            <!-- Renderizado dinámicamente mediante JS -->
+          </ul>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Footer Elegante -->
+    <footer class="app-footer">
+      <p>Servicio Social Tracker · Diseñado con precisión y elegancia</p>
+    </footer>
+
+  </div>
+
+  <!-- Modal de Confirmación de Eliminación -->
+  <div id="deleteModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-icon warning-icon">
+        <i data-lucide="alert-triangle"></i>
+      </div>
+      <h3 class="modal-title">¿Eliminar actividad?</h3>
+      <p class="modal-desc">Esta acción eliminará el registro de horas seleccionado de tu bitácora de forma permanente.</p>
+      <div class="modal-actions">
+        <button type="button" id="cancelDeleteBtn" class="btn-secondary">Cancelar</button>
+        <button type="button" id="confirmDeleteBtn" class="btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Edición de Actividad -->
+  <div id="editModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card edit-modal-card">
+      <div class="modal-header-row">
+        <div class="modal-title-wrap">
+          <i data-lucide="pencil" class="modal-header-icon"></i>
+          <h3 class="modal-title">Editar Actividad</h3>
+        </div>
+        <button type="button" id="closeEditModalBtn" class="btn-close-modal" aria-label="Cerrar modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <form id="editActivityForm" class="modern-form">
+        <input type="hidden" id="editId" />
+        
+        <div class="form-row form-row-2">
+          <div class="form-group">
+            <label for="editFecha">
+              <i data-lucide="calendar"></i>
+              <span>Fecha</span>
+            </label>
+            <div class="input-wrap">
+              <input type="date" id="editFecha" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editHoras">
+              <i data-lucide="clock"></i>
+              <span>Horas</span>
+            </label>
+            <div class="input-wrap">
+              <input type="number" id="editHoras" min="0.5" step="0.5" required />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editDescripcion">
+            <i data-lucide="file-text"></i>
+            <span>Descripción</span>
+          </label>
+          <div class="input-wrap">
+            <textarea id="editDescripcion" rows="3" required></textarea>
+          </div>
+        </div>
+
+        <div class="form-row form-row-2">
+          <div class="form-group">
+            <label for="editLugar">
+              <i data-lucide="map-pin"></i>
+              <span>Lugar</span>
+            </label>
+            <div class="input-wrap">
+              <input type="text" id="editLugar" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editEvidenciaUrl">
+              <i data-lucide="link-2"></i>
+              <span>Enlace Evidencia</span>
+            </label>
+            <div class="input-wrap">
+              <input type="url" id="editEvidenciaUrl" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="cancelEditBtn" class="btn-secondary">Cancelar</button>
+          <button type="submit" id="saveEditBtn" class="btn-primary">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Ejecutivo de Autenticación (Login / Registro / Recuperación) -->
+  <div id="authModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card auth-modal-card">
+      <div class="modal-header-row">
+        <div class="modal-title-wrap">
+          <i data-lucide="lock" class="modal-header-icon"></i>
+          <h3 class="modal-title" id="authModalTitle">Acceso Seguro</h3>
+        </div>
+        <button type="button" id="closeAuthModalBtn" class="btn-close-modal" aria-label="Cerrar modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <!-- Pestañas de Login y Registro -->
+      <div class="auth-tabs" id="authTabs">
+        <button type="button" class="auth-tab active" data-tab="login">Iniciar Sesión</button>
+        <button type="button" class="auth-tab" data-tab="register">Crear Cuenta</button>
+      </div>
+
+      <!-- Vista 1: Formulario de Iniciar Sesión -->
+      <form id="loginForm" class="modern-form auth-view">
+        <div class="form-group">
+          <label for="loginEmail">
+            <i data-lucide="mail"></i>
+            <span>Correo Electrónico</span>
+          </label>
+          <div class="input-wrap">
+            <input type="email" id="loginEmail" placeholder="tu@correo.com" required autocomplete="email" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword">
+            <i data-lucide="key-round"></i>
+            <span>Contraseña</span>
+          </label>
+          <div class="input-wrap password-wrap">
+            <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password" />
+            <button type="button" class="btn-toggle-pwd" data-target="loginPassword" aria-label="Mostrar u ocultar contraseña">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="auth-aux-row">
+          <button type="button" id="toForgotBtn" class="link-btn">¿Olvidaste tu contraseña?</button>
+        </div>
+
+        <button type="submit" id="submitLoginBtn" class="btn-primary auth-submit-btn">
+          <span>Iniciar Sesión</span>
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </form>
+
+      <!-- Vista 2: Formulario de Registro -->
+      <form id="registerForm" class="modern-form auth-view" style="display: none;">
+        <div class="form-group">
+          <label for="registerNombre">
+            <i data-lucide="user"></i>
+            <span>Nombre Completo</span>
+          </label>
+          <div class="input-wrap">
+            <input type="text" id="registerNombre" placeholder="Ej. Alexis Mendoza" required autocomplete="name" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="registerEmail">
+            <i data-lucide="mail"></i>
+            <span>Correo Electrónico</span>
+          </label>
+          <div class="input-wrap">
+            <input type="email" id="registerEmail" placeholder="tu@correo.com" required autocomplete="email" />
+          </div>
+        </div>
+
+        <div class="form-row form-row-2">
+          <div class="form-group">
+            <label for="registerPassword">
+              <i data-lucide="key-round"></i>
+              <span>Contraseña</span>
+            </label>
+            <div class="input-wrap password-wrap">
+              <input type="password" id="registerPassword" placeholder="Mínimo 6 car." minlength="6" required autocomplete="new-password" />
+              <button type="button" class="btn-toggle-pwd" data-target="registerPassword" aria-label="Mostrar u ocultar">
+                <i data-lucide="eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="registerPasswordConfirm">
+              <i data-lucide="shield-check"></i>
+              <span>Confirmar</span>
+            </label>
+            <div class="input-wrap password-wrap">
+              <input type="password" id="registerPasswordConfirm" placeholder="Repite clave" minlength="6" required autocomplete="new-password" />
+              <button type="button" class="btn-toggle-pwd" data-target="registerPasswordConfirm" aria-label="Mostrar u ocultar">
+                <i data-lucide="eye"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="auth-security-notice">
+          <i data-lucide="shield"></i>
+          <span>Contraseñas protegidas con Hash Bcrypt + Salt (12 rondas). Tus horas son privadas.</span>
+        </div>
+
+        <button type="submit" id="submitRegisterBtn" class="btn-primary auth-submit-btn">
+          <span>Crear Mi Cuenta</span>
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </form>
+
+      <!-- Vista 3: Olvidé mi Contraseña -->
+      <form id="forgotForm" class="modern-form auth-view" style="display: none;">
+        <p class="auth-instruction">Ingresa el correo electrónico asociado a tu cuenta. Te enviaremos un enlace seguro para restablecer tu contraseña.</p>
+        
+        <div class="form-group">
+          <label for="forgotEmail">
+            <i data-lucide="mail"></i>
+            <span>Correo Electrónico</span>
+          </label>
+          <div class="input-wrap">
+            <input type="email" id="forgotEmail" placeholder="tu@correo.com" required />
+          </div>
+        </div>
+
+        <button type="submit" id="submitForgotBtn" class="btn-primary auth-submit-btn">
+          <span>Enviar Enlace de Recuperación</span>
+          <i data-lucide="send"></i>
+        </button>
+
+        <button type="button" id="backToLoginFromForgotBtn" class="btn-secondary" style="width: 100%; margin-top: 0.5rem;">
+          Volver al Inicio de Sesión
+        </button>
+      </form>
+
+      <!-- Vista 4: Restablecer Contraseña (mediante token de correo) -->
+      <form id="resetPasswordForm" class="modern-form auth-view" style="display: none;">
+        <p class="auth-instruction">Introduce tu nueva contraseña para actualizar tu acceso.</p>
+        <input type="hidden" id="resetTokenValue" />
+
+        <div class="form-group">
+          <label for="newPassword">
+            <i data-lucide="key-round"></i>
+            <span>Nueva Contraseña</span>
+          </label>
+          <div class="input-wrap password-wrap">
+            <input type="password" id="newPassword" placeholder="Mínimo 6 caracteres" minlength="6" required />
+            <button type="button" class="btn-toggle-pwd" data-target="newPassword" aria-label="Mostrar u ocultar">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="newPasswordConfirm">
+            <i data-lucide="shield-check"></i>
+            <span>Confirmar Nueva Contraseña</span>
+          </label>
+          <div class="input-wrap password-wrap">
+            <input type="password" id="newPasswordConfirm" placeholder="Repite la nueva contraseña" minlength="6" required />
+            <button type="button" class="btn-toggle-pwd" data-target="newPasswordConfirm" aria-label="Mostrar u ocultar">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="submitResetPasswordBtn" class="btn-primary auth-submit-btn">
+          <span>Actualizar Contraseña</span>
+          <i data-lucide="check"></i>
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- Contenedor Flotante de Notificaciones Toast -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- Scripts: CDNs confiables de animación y visualización -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Lógica modular de la aplicación -->
+  <script type="module" src="js/app.js?v=3.1"></script>
+</body>
+</html>

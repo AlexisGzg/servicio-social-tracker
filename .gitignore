@@ -1,0 +1,21 @@
+# Dependencias
+node_modules/
+backend/node_modules/
+
+# Variables de entorno y credenciales secretas (NUNCA subir a GitHub)
+.env
+.env.*
+backend/.env
+backend/.env.*
+
+# Logs y depuración
+*.log
+npm-debug.log*
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+dist/
+build/
